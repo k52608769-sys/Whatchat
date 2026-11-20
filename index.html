@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsChat Live — Real-Time P2P Web Messenger</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PeerJS for Zero-Backend Real-Time WebRTC Cross-Device Messaging -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        /* Custom Scrollbars & WhatsApp Doodle Pattern */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(134, 150, 160, 0.35);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(134, 150, 160, 0.55);
+        }
+
+        .chat-wallpaper-light {
+            background-color: #efeae2;
+            background-image: radial-gradient(rgba(17, 27, 33, 0.06) 1.25px, transparent 1.25px),
+                              radial-gradient(rgba(0, 168, 132, 0.05) 1.25px, #efeae2 1.25px);
+            background-size: 28px 28px;
+            background-position: 0 0, 14px 14px;
+        }
+
+        .chat-wallpaper-dark {
+            background-color: #0b141a;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1.25px, transparent 1.25px),
+                              radial-gradient(rgba(0, 168, 132, 0.04) 1.25px, #0b141a 1.25px);
+            background-size: 28px 28px;
+            background-position: 0 0, 14px 14px;
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.95) translateY(6px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .msg-animate {
+            animation: popIn 0.18s ease-out forwards;
+        }
+
+        /* Prevent iOS bounce overflow */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-[#d1d7db] dark:bg-[#090e11] text-[#111b21] dark:text-[#e9edef] font-sans antialiased select-none sm:select-auto">
+
+    <!-- ===================================================================== -->
+    <!-- TOAST / NOTIFICATION BANNER (Replaces alert/confirm)                  -->
+    <!-- ===================================================================== -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-xs w-full pointer-events-none"></div>
+
+    <!-- ===================================================================== -->
+    <!-- AUTHENTICATION SCREEN (LOCAL NAME & PASSWORD - NO EMAIL REQUIRED)     -->
+    <!-- ===================================================================== -->
+    <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#efeae2] dark:bg-[#0b141a] overflow-y-auto">
+        <!-- Top WhatsApp Green Accent Header Strip -->
+        <div class="fixed top-0 left-0 right-0 h-48 bg-[#00a884] dark:bg-[#005c4b] z-0"></div>
+
+        <div class="relative z-10 w-full max-w-md bg-white dark:bg-[#202c33] rounded-2xl shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden my-auto">
+            <!-- Brand Header -->
+            <div class="px-6 pt-7 pb-5 text-center border-b border-gray-100 dark:border-white/10">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#00a884] text-white shadow-lg shadow-[#00a884]/30 mb-3">
+                    <!-- WhatsApp-style Chat Bubble SVG -->
+                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.331 4.986L2 22l5.207-1.365a9.923 9.923 0 0 0 4.824 1.246h.004c5.515 0 9.968-4.453 9.968-9.969 0-2.663-1.037-5.167-2.92-7.05A9.903 9.903 0 0 0 12.031 2zm5.82 14.274c-.245.69-1.425 1.319-1.976 1.402-.505.076-1.144.108-1.847-.116-.427-.136-.974-.318-1.676-.621-2.95-1.273-4.876-4.244-5.023-4.44-.147-.196-1.199-1.595-1.199-3.042 0-1.448.759-2.16 1.028-2.454.269-.294.588-.368.784-.368.196 0 .392.002.563.01.181.009.423-.069.662.505.245.589.833 2.036.906 2.183.074.147.123.319.025.515-.098.196-.147.319-.294.49-.147.172-.309.383-.441.515-.147.147-.3.306-.129.6.172.294.762 1.258 1.637 2.038 1.125 1.003 2.073 1.314 2.367 1.461.294.147.466.123.638-.074.172-.196.736-.858.932-1.153.196-.294.392-.245.662-.147.27.098 1.716.809 2.01.956.294.147.49.221.563.343.074.123.074.711-.171 1.401z"/>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-[#111b21] dark:text-white">WhatsChat Live</h1>
+                <p class="text-xs sm:text-sm text-[#54656f] dark:text-[#8696a0] mt-1">
+                    Instant cross-device messaging • Local account (No email needed)
+                </p>
+            </div>
+
+            <!-- Invite Banner if Opened via ?connect=WC-XXXX-XXXX -->
+            <div id="invite-detected-banner" class="hidden mx-6 mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#00a884] animate-pulse shrink-0"></span>
+                <div>
+                    <p class="font-semibold">Friend Invite Link Detected!</p>
+                    <p class="opacity-90">Sign in or create a local account to connect with <span id="invite-target-id" class="font-mono font-bold"></span>.</p>
+                </div>
+            </div>
+
+            <!-- Tabs: Login vs Create Account -->
+            <div class="px-6 pt-5">
+                <div class="grid grid-cols-2 p-1 rounded-xl bg-gray-100 dark:bg-[#111b21]">
+                    <button id="tab-login" type="button" onclick="switchAuthTab('login')" class="py-2 text-sm font-semibold rounded-lg bg-white dark:bg-[#2a3942] text-[#00a884] shadow-sm transition">
+                        Sign In
+                    </button>
+                    <button id="tab-register" type="button" onclick="switchAuthTab('register')" class="py-2 text-sm font-semibold rounded-lg text-[#54656f] dark:text-[#8696a0] hover:text-[#111b21] dark:hover:text-white transition">
+                        Create Account
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auth Form -->
+            <form id="auth-form" class="p-6 space-y-4" onsubmit="handleAuthSubmit(event)">
+                <div>
+                    <label for="auth-username" class="block text-xs font-semibold uppercase tracking-wider text-[#54656f] dark:text-[#8696a0] mb-1.5">
+                        Your Name / Username
+                    </label>
+                    <input id="auth-username" type="text" required minlength="2" maxlength="24" autocomplete="username"
+                        placeholder="e.g. Aarav, Priya, Alex..."
+                        class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#2a3942] border border-gray-200 dark:border-white/10 text-sm text-[#111b21] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#00a884] transition">
+                </div>
+
+                <div>
+                    <label for="auth-password" class="block text-xs font-semibold uppercase tracking-wider text-[#54656f] dark:text-[#8696a0] mb-1.5">
+                        Local Password
+                    </label>
+                    <div class="relative">
+                        <input id="auth-password" type="password" required minlength="3" maxlength="32" autocomplete="current-password"
+                            placeholder="Enter a simple password"
+                            class="w-full px-4 py-3 pr-11 rounded-xl bg-gray-50 dark:bg-[#2a3942] border border-gray-200 dark:border-white/10 text-sm text-[#111b21] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#00a884] transition">
+                        <button type="button" onclick="togglePasswordVisibility()" aria-label="Toggle Password"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-[#54656f] dark:text-[#8696a0] hover:text-[#00a884] p-1">
+                            <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <p id="auth-error" class="hidden text-xs font-medium text-red-500 bg-red-50 dark:bg-red-950/40 px-3 py-2 rounded-lg"></p>
+
+                <button id="auth-submit-btn" type="submit"
+                    class="w-full py-3 px-4 rounded-xl bg-[#00a884] hover:bg-[#008f72] active:scale-[0.99] text-white font-semibold text-sm shadow-lg shadow-[#00a884]/25 transition flex items-center justify-center gap-2">
+                    <span>Sign In to WhatsChat</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Saved Local Accounts Quick Switcher -->
+            <div id="saved-accounts-section" class="hidden px-6 pb-6 pt-1 border-t border-gray-100 dark:border-white/10">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-[#54656f] dark:text-[#8696a0] mt-3 mb-2">
+                    Saved Accounts on This Browser
+                </p>
+                <div id="saved-accounts-list" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MAIN WHATSAPP WEB APPLICATION SHELL                                   -->
+    <!-- ===================================================================== -->
+    <div id="app-shell" class="hidden h-full w-full max-w-[1600px] mx-auto sm:p-3 lg:p-4 flex items-center justify-center">
+        <div class="w-full h-full bg-white dark:bg-[#111b21] sm:rounded-2xl shadow-2xl overflow-hidden flex border border-black/5 dark:border-white/10">
+
+            <!-- =============================================================== -->
+            <!-- LEFT SIDEBAR: PROFILE, FRIEND ID, SEARCH & CHATS LIST           -->
+            <!-- =============================================================== -->
+            <aside id="sidebar-panel" class="w-full md:w-[370px] lg:w-[410px] shrink-0 h-full flex flex-col border-r border-gray-200 dark:border-white/10 bg-white dark:bg-[#111b21]">
+
+                <!-- Top User Header -->
+                <header class="px-4 py-3 bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between gap-2 shrink-0">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div id="my-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+                            U
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <h2 id="my-display-name" class="font-semibold text-sm truncate text-[#111b21] dark:text-white">User</h2>
+                                <span id="network-status-dot" title="Connecting to P2P network..." class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0"></span>
+                            </div>
+                            <p id="network-status-text" class="text-[11px] text-[#54656f] dark:text-[#8696a0] truncate">Connecting...</p>
+                        </div>
+                    </div>
+
+                    <!-- Header Action Buttons -->
+                    <div class="flex items-center gap-1">
+                        <!-- Add Friend Button -->
+                        <button type="button" onclick="openAddFriendModal()" title="Add Friend by ID"
+                            class="p-2.5 rounded-full text-[#54656f] dark:text-[#aebac1] hover:bg-black/5 dark:hover:bg-white/10 transition relative">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                            </svg>
+                        </button>
+
+                        <!-- Dark / Light Mode Toggle -->
+                        <button type="button" onclick="toggleTheme()" title="Switch Light / Dark Mode"
+                            class="p-2.5 rounded-full text-[#54656f] dark:text-[#aebac1] hover:bg-black/5 dark:hover:bg-white/10 transition">
+                            <svg id="theme-icon-sun" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            <svg id="theme-icon-moon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                            </svg>
+                        </button>
+
+                        <!-- Switch Account / Logout -->
+                        <button type="button" onclick="logoutUser()" title="Switch Account / Log Out"
+                            class="p-2.5 rounded-full text-[#54656f] dark:text-[#aebac1] hover:bg-red-500/10 hover:text-red-500 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Shareable Friend ID Card -->
+                <div class="px-3 py-2.5 bg-emerald-50/80 dark:bg-[#182229] border-b border-gray-200/80 dark:border-white/5 shrink-0">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-[#008069] dark:text-[#00a884] block">
+                                Your Shareable Friend ID
+                            </span>
+                            <span id="my-friend-id" class="font-mono text-xs sm:text-sm font-bold text-[#111b21] dark:text-white tracking-wide">
+                                WC-0000-0000
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onclick="copyMyFriendId()"
+                                class="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#2a3942] hover:bg-gray-50 dark:hover:bg-[#374852] border border-gray-200 dark:border-white/10 text-xs font-semibold text-[#111b21] dark:text-white shadow-xs transition">
+                                Copy ID
+                            </button>
+                            <button type="button" onclick="copyMyInviteLink()"
+                                class="px-2.5 py-1.5 rounded-lg bg-[#00a884] hover:bg-[#008f72] text-xs font-semibold text-white shadow-xs transition">
+                                Invite Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Input Bar -->
+                <div class="p-2.5 bg-white dark:bg-[#111b21] border-b border-gray-100 dark:border-white/5 shrink-0">
+                    <div class="relative flex items-center">
+                        <svg class="w-4 h-4 text-[#54656f] dark:text-[#8696a0] absolute left-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input id="chat-search-input" type="text" oninput="renderContactList()"
+                            placeholder="Search friends or Friend ID..."
+                            class="w-full pl-10 pr-4 py-2 rounded-xl bg-[#f0f2f5] dark:bg-[#202c33] text-sm text-[#111b21] dark:text-white placeholder-[#54656f] dark:placeholder-[#8696a0] focus:outline-none focus:ring-2 focus:ring-[#00a884]/50">
+                    </div>
+                </div>
+
+                <!-- Contacts / Chats Scrollable List -->
+                <div id="contacts-list" class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-white/5">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <!-- Quick Add Friend CTA Footer on Mobile/Desktop -->
+                <div class="p-3 bg-[#f0f2f5]/60 dark:bg-[#202c33]/60 border-t border-gray-200/70 dark:border-white/5 shrink-0">
+                    <button type="button" onclick="openAddFriendModal()"
+                        class="w-full py-2.5 px-4 rounded-xl bg-[#00a884] hover:bg-[#008f72] text-white text-xs sm:text-sm font-semibold shadow-sm transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span>Connect with a Friend</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- =============================================================== -->
+            <!-- RIGHT PANEL: ACTIVE CONVERSATION OR WELCOME SCREEN              -->
+            <!-- =============================================================== -->
+            <main id="chat-panel" class="hidden md:flex flex-1 flex-col h-full bg-[#efeae2] dark:bg-[#0b141a] relative min-w-0">
+
+                <!-- Empty State Welcome Screen (When no friend selected) -->
+                <div id="welcome-screen" class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f0f2f5] dark:bg-[#222e35] border-b-[6px] border-[#00a884]">
+                    <div class="w-24 h-24 rounded-3xl bg-[#00a884]/15 text-[#00a884] flex items-center justify-center mb-6">
+                        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-light text-[#41525d] dark:text-[#e9edef] mb-3">
+                        WhatsChat Live Web
+                    </h2>
+                    <p class="max-w-md text-sm text-[#667781] dark:text-[#8696a0] leading-relaxed mb-6">
+                        Send real-time messages, photos, videos, and voice clips across different phones and laptops. Share your <strong class="text-[#111b21] dark:text-white">Friend ID</strong> or <strong class="text-[#111b21] dark:text-white">Invite Link</strong> to start chatting live!
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center gap-3">
+                        <button type="button" onclick="openAddFriendModal()"
+                            class="px-5 py-2.5 rounded-full bg-[#00a884] hover:bg-[#008f72] text-white text-sm font-semibold shadow-md transition">
+                            + Add Friend by ID
+                        </button>
+                        <button type="button" onclick="copyMyInviteLink()"
+                            class="px-5 py-2.5 rounded-full bg-white dark:bg-[#2a3942] hover:bg-gray-50 dark:hover:bg-[#374852] text-[#111b21] dark:text-white text-sm font-semibold border border-gray-200 dark:border-white/10 shadow-sm transition">
+                            Copy Invite Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Chat Container -->
+                <div id="active-chat-container" class="hidden flex-1 flex flex-col h-full min-h-0">
+
+                    <!-- Chat Top Header -->
+                    <header class="px-3 sm:px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#202c33] border-b border-gray-200 dark:border-white/10 flex items-center justify-between gap-2 shrink-0 z-10">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <!-- Back Button for Mobile -->
+                            <button type="button" onclick="closeMobileChat()" aria-label="Back to chats"
+                                class="md:hidden p-2 -ml-1 rounded-full text-[#54656f] dark:text-[#aebac1] hover:bg-black/5 dark:hover:bg-white/10">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                            </button>
+
+                            <div id="active-friend-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                F
+                            </div>
+
+                            <div class="min-w-0">
+                                <h3 id="active-friend-name" class="font-semibold text-sm sm:text-base truncate text-[#111b21] dark:text-white">
+                                    Friend Name
+                                </h3>
+                                <p id="active-friend-status" class="text-xs text-[#54656f] dark:text-[#8696a0] truncate">
+                                    Offline
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Chat Header Actions -->
+                        <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+                            <button type="button" onclick="reconnectActiveFriend()" title="Reconnect P2P Session"
+                                class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#2a3942] hover:bg-gray-100 dark:hover:bg-[#374852] text-[#111b21] dark:text-[#e9edef] border border-gray-200 dark:border-white/10 transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-[#00a884]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                <span class="hidden sm:inline">Connect</span>
+                            </button>
+
+                            <button type="button" onclick="openClearChatModal()" title="Clear Chat History"
+                                class="p-2 rounded-full text-[#54656f] dark:text-[#aebac1] hover:bg-black/5 dark:hover:bg-white/10 transition">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </header>
+
+                    <!-- Messages Scroll Area -->
+                    <div id="messages-container" class="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-12 py-4 space-y-2 chat-wallpaper-light dark:chat-wallpaper-dark">
+                        <!-- Messages rendered dynamically -->
+                    </div>
+
+                    <!-- Emoji Picker Drawer -->
+                    <div id="emoji-picker" class="hidden px-4 py-3 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-gray-200 dark:border-white/10 max-h-44 overflow-y-auto">
+                        <div id="emoji-grid" class="grid grid-cols-8 sm:grid-cols-12 gap-1.5 text-xl"></div>
+                    </div>
+
+                    <!-- Media Attachment Preview Bar -->
+                    <div id="attachment-preview-bar" class="hidden px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#182229] border-t border-gray-200 dark:border-white/10 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div id="attachment-thumb" class="w-12 h-12 rounded-lg bg-black/10 dark:bg-white/10 overflow-hidden flex items-center justify-center shrink-0"></div>
+                            <div class="min-w-0">
+                                <p id="attachment-name" class="text-xs font-semibold truncate text-[#111b21] dark:text-white">photo.jpg</p>
+                                <p id="attachment-meta" class="text-[11px] text-[#54656f] dark:text-[#8696a0]">Ready to send</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearPendingAttachment()" class="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Bottom Message Input Composer -->
+                    <footer class="px-2.5 sm:px-4 py-2.5 bg-[#f0f2f5] dark:bg-[#202c33] flex items-center gap-1.5 sm:gap-2 shrink-0">
+                        <!-- Emoji Button -->
+                        <button type="button" onclick="toggleEmojiPicker()" aria-label="Emojis"
+                            class="p-2.5 rounded-full text-[#54656f] dark:text-[#8696a0] hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </button>
+
+                        <!-- Attach Photo / Video / Audio Button -->
+                        <label for="media-file-input" title="Send Photo, Video, or Audio"
+                            class="p-2.5 rounded-full text-[#54656f] dark:text-[#8696a0] hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                            </svg>
+                        </label>
+                        <input id="media-file-input" type="file" accept="image/*,video/*,audio/*" class="hidden" onchange="handleMediaFileSelect(event)">
+
+                        <!-- Text Input -->
+                        <div class="flex-1 min-w-0">
+                            <input id="message-input" type="text" autocomplete="off"
+                                placeholder="Type a message..."
+                                oninput="handleTypingInput()"
+                                onkeydown="if(event.key === 'Enter' && !event.shiftKey){ event.preventDefault(); sendCurrentMessage(); }"
+                                class="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#2a3942] text-sm text-[#111b21] dark:text-white placeholder-[#54656f] dark:placeholder-[#8696a0] focus:outline-none">
+                        </div>
+
+                        <!-- Send Button -->
+                        <button type="button" onclick="sendCurrentMessage()" aria-label="Send Message"
+                            class="p-2.5 rounded-full bg-[#00a884] hover:bg-[#008f72] active:scale-95 text-white shadow-sm transition shrink-0">
+                            <svg class="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                            </svg>
+                        </button>
+                    </footer>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: ADD FRIEND / CONNECT BY FRIEND ID                            -->
+    <!-- ===================================================================== -->
+    <div id="add-friend-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white dark:bg-[#202c33] rounded-2xl shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden">
+            <div class="px-6 py-4 bg-[#00a884] text-white flex items-center justify-between">
+                <h3 class="font-semibold text-base">Connect with a Friend</h3>
+                <button type="button" onclick="closeAddFriendModal()" class="p-1 rounded-full hover:bg-white/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form onsubmit="handleAddFriendSubmit(event)" class="p-6 space-y-4">
+                <p class="text-xs text-[#54656f] dark:text-[#8696a0] leading-relaxed">
+                    Ask your friend to open <strong>WhatsChat Live</strong> on their phone or computer and send you their <strong>Friend ID</strong> (e.g., <span class="font-mono">WC-4829-1930</span>).
+                </p>
+
+                <div>
+                    <label for="friend-id-input" class="block text-xs font-semibold uppercase tracking-wider text-[#54656f] dark:text-[#8696a0] mb-1.5">
+                        Friend's ID *
+                    </label>
+                    <input id="friend-id-input" type="text" required placeholder="WC-XXXX-XXXX"
+                        class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-[#2a3942] border border-gray-200 dark:border-white/10 font-mono text-sm uppercase text-[#111b21] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#00a884]">
+                </div>
+
+                <div>
+                    <label for="friend-nickname-input" class="block text-xs font-semibold uppercase tracking-wider text-[#54656f] dark:text-[#8696a0] mb-1.5">
+                        Nickname (Optional)
+                    </label>
+                    <input id="friend-nickname-input" type="text" maxlength="24" placeholder="e.g. Best Friend, Rahul..."
+                        class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-[#2a3942] border border-gray-200 dark:border-white/10 text-sm text-[#111b21] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#00a884]">
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeAddFriendModal()"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-[#54656f] dark:text-[#8696a0] hover:bg-gray-100 dark:hover:bg-white/5">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-[#00a884] hover:bg-[#008f72] text-white text-sm font-semibold shadow-sm transition">
+                        Connect & Chat
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: CONFIRM CLEAR CHAT                                           -->
+    <!-- ===================================================================== -->
+    <div id="clear-chat-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="w-full max-w-sm bg-white dark:bg-[#202c33] rounded-2xl p-6 shadow-2xl border border-black/5 dark:border-white/10">
+            <h3 class="font-semibold text-base text-[#111b21] dark:text-white mb-2">Clear this chat?</h3>
+            <p class="text-xs text-[#54656f] dark:text-[#8696a0] mb-5">
+                All messages and media in this conversation on your device will be deleted.
+            </p>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeClearChatModal()"
+                    class="px-4 py-2 rounded-xl text-sm font-medium text-[#54656f] dark:text-[#8696a0] hover:bg-gray-100 dark:hover:bg-white/5">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmClearChat()"
+                    class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition">
+                    Clear Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: FULLSCREEN IMAGE LIGHTBOX VIEWER                             -->
+    <!-- ===================================================================== -->
+    <div id="lightbox-modal" class="hidden fixed inset-0 z-[70] bg-black/90 flex flex-col items-center justify-center p-4" onclick="closeLightbox()">
+        <div class="w-full max-w-4xl flex items-center justify-between text-white mb-3" onclick="event.stopPropagation()">
+            <span id="lightbox-caption" class="text-sm font-medium truncate">Image Preview</span>
+            <div class="flex items-center gap-2">
+                <a id="lightbox-download" href="#" download="whatschat-image.jpg"
+                    class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold transition">
+                    Download
+                </a>
+                <button type="button" onclick="closeLightbox()" class="p-1.5 rounded-full bg-white/15 hover:bg-white/25">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <img id="lightbox-img" src="" alt="Full preview" class="max-h-[82vh] max-w-full rounded-xl object-contain shadow-2xl" onclick="event.stopPropagation()">
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- JAVASCRIPT APPLICATION LOGIC                                          -->
+    <!-- ===================================================================== -->
+    <script>
+        // =====================================================================
+        // 1. STORAGE KEYS & APPLICATION STATE
+        // =====================================================================
+        const STORAGE_KEYS = {
+            ACCOUNTS: 'whatschat_accounts_v2',
+            SESSION: 'whatschat_active_user_v2',
+            THEME: 'whatschat_theme_v2'
+        };
+
+        const AVATAR_COLORS = [
+            '#00a884', '#0284c7', '#7c3aed', '#db2777',
+            '#ea580c', '#059669', '#4f46e5', '#be123c'
+        ];
+
+        const QUICK_EMOJIS = [
+            '😀','😂','🥰','😍','😎','🥳','🤩','😊',
+            '🙌','👍','👏','🙏','❤️','🔥','✨','🎉',
+            '😢','😭','😮','🤔','😴','🤣','😇','🤝',
+            '💯','🚀','🌟','🍕','☕','🎵','📸','🎬'
+        ];
+
+        let authMode = 'login'; // 'login' | 'register'
+        let currentUser = null; // Active local account object
+        let activeFriendId = null; // Currently selected friend's WC-XXXX-XXXX ID
+        let peerInstance = null; // PeerJS WebRTC instance
+        let liveConnections = {}; // Map of friendId -> DataConnection
+        let onlinePeers = {}; // Map of friendId -> boolean
+        let typingPeers = {}; // Map of friendId -> timeoutId
+        let lastTypingSentAt = 0;
+        let pendingAttachment = null; // { type: 'image'|'video'|'audio', dataUrl, name, sizeLabel }
+        let inviteParamId = null;
+
+        // =====================================================================
+        // 2. INITIALIZATION & URL INVITE DETECTION
+        // =====================================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            renderEmojiGrid();
+            checkUrlInviteParam();
+            renderSavedAccountsList();
+
+            // Auto-login if session exists
+            const savedUsername = localStorage.getItem(STORAGE_KEYS.SESSION);
+            if (savedUsername) {
+                const accounts = getAllAccounts();
+                const found = accounts[savedUsername.toLowerCase()];
+                if (found) {
+                    loginSuccess(found);
+                    return;
+                }
+            }
+            showAuthScreen();
+        });
+
+        function checkUrlInviteParam() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const connectId = params.get('connect');
+                if (connectId && /^WC-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(connectId.trim())) {
+                    inviteParamId = connectId.trim().toUpperCase();
+                    const banner = document.getElementById('invite-detected-banner');
+                    const targetSpan = document.getElementById('invite-target-id');
+                    if (banner && targetSpan) {
+                        targetSpan.textContent = inviteParamId;
+                        banner.classList.remove('hidden');
+                    }
+                }
+            } catch (err) {
+                console.warn('URL param parse skipped:', err);
+            }
+        }
+
+        // =====================================================================
+        // 3. THEME MANAGEMENT (LIGHT / DARK MODE)
+        // =====================================================================
+        function initTheme() {
+            const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem(STORAGE_KEYS.THEME, isDark ? 'dark' : 'light');
+        }
+
+        // =====================================================================
+        // 4. LOCAL STORAGE ACCOUNT PERSISTENCE (NO EMAIL REQUIRED)
+        // =====================================================================
+        function getAllAccounts() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveAllAccounts(accounts) {
+            try {
+                localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
+            } catch (e) {
+                showToast('Storage almost full! Try clearing old media messages.', 'error');
+            }
+        }
+
+        function persistCurrentUser() {
+            if (!currentUser) return;
+            const accounts = getAllAccounts();
+            accounts[currentUser.username.toLowerCase()] = currentUser;
+            saveAllAccounts(accounts);
+        }
+
+        function generateFriendId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+            return `WC-${part()}-${part()}`;
+        }
+
+        function getRandomAvatarColor(seedStr) {
+            let hash = 0;
+            for (let i = 0; i < seedStr.length; i++) {
+                hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.trim().split(/\s+/);
+            if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+
+        // =====================================================================
+        // 5. AUTHENTICATION UI & HANDLERS
+        // =====================================================================
+        function switchAuthTab(mode) {
+            authMode = mode;
+            const loginTab = document.getElementById('tab-login');
+            const regTab = document.getElementById('tab-register');
+            const submitBtn = document.getElementById('auth-submit-btn').querySelector('span');
+            const errorEl = document.getElementById('auth-error');
+            errorEl.classList.add('hidden');
+
+            if (mode === 'login') {
+                loginTab.className = 'py-2 text-sm font-semibold rounded-lg bg-white dark:bg-[#2a3942] text-[#00a884] shadow-sm transition';
+                regTab.className = 'py-2 text-sm font-semibold rounded-lg text-[#54656f] dark:text-[#8696a0] hover:text-[#111b21] dark:hover:text-white transition';
+                submitBtn.textContent = 'Sign In to WhatsChat';
+            } else {
+                regTab.className = 'py-2 text-sm font-semibold rounded-lg bg-white dark:bg-[#2a3942] text-[#00a884] shadow-sm transition';
+                loginTab.className = 'py-2 text-sm font-semibold rounded-lg text-[#54656f] dark:text-[#8696a0] hover:text-[#111b21] dark:hover:text-white transition';
+                submitBtn.textContent = 'Create Local Account';
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('auth-password');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function handleAuthSubmit(event) {
+            event.preventDefault();
+            const rawName = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const errorEl = document.getElementById('auth-error');
+
+            if (rawName.length < 2) {
+                showAuthError('Please enter a name with at least 2 characters.');
+                return;
+            }
+            if (password.length < 3) {
+                showAuthError('Please enter a password with at least 3 characters.');
+                return;
+            }
+
+            const key = rawName.toLowerCase();
+            const accounts = getAllAccounts();
+
+            if (authMode === 'register') {
+                if (accounts[key]) {
+                    showAuthError('This name already exists on this browser. Switch to "Sign In" or choose another name.');
+                    return;
+                }
+                const newAccount = {
+                    username: rawName,
+                    password: password,
+                    friendId: generateFriendId(),
+                    avatarColor: getRandomAvatarColor(rawName),
+                    contacts: {}, // friendId -> { friendId, name, avatarColor, unread }
+                    messages: {}  // friendId -> Array of message objects
+                };
+                accounts[key] = newAccount;
+                saveAllAccounts(accounts);
+                errorEl.classList.add('hidden');
+                showToast(`Welcome, ${rawName}! Local account created.`);
+                loginSuccess(newAccount);
+            } else {
+                const existing = accounts[key];
+                if (!existing) {
+                    showAuthError('Account not found on this browser. Click "Create Account" first.');
+                    return;
+                }
+                if (existing.password !== password) {
+                    showAuthError('Incorrect password for this local account.');
+                    return;
+                }
+                errorEl.classList.add('hidden');
+                loginSuccess(existing);
+            }
+        }
+
+        function showAuthError(msg) {
+            const errorEl = document.getElementById('auth-error');
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+
+        function renderSavedAccountsList() {
+            const accounts = Object.values(getAllAccounts());
+            const section = document.getElementById('saved-accounts-section');
+            const list = document.getElementById('saved-accounts-list');
+            if (!accounts.length) {
+                section.classList.add('hidden');
+                return;
+            }
+            section.classList.remove('hidden');
+            list.innerHTML = '';
+            accounts.forEach(acc => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-[#2a3942] hover:bg-[#00a884]/15 text-xs font-medium text-[#111b21] dark:text-white transition';
+                btn.innerHTML = `
+                    <span class="w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center" style="background:${acc.avatarColor}">
+                        ${getInitials(acc.username)}
+                    </span>
+                    <span>${escapeHtml(acc.username)}</span>
+                `;
+                btn.onclick = () => {
+                    switchAuthTab('login');
+                    document.getElementById('auth-username').value = acc.username;
+                    document.getElementById('auth-password').focus();
+                };
+                list.appendChild(btn);
+            });
+        }
+
+        function showAuthScreen() {
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('app-shell').classList.add('hidden');
+            renderSavedAccountsList();
+        }
+
+        function loginSuccess(account) {
+            currentUser = account;
+            localStorage.setItem(STORAGE_KEYS.SESSION, account.username);
+
+            // Populate user header
+            const myAvatar = document.getElementById('my-avatar');
+            myAvatar.textContent = getInitials(currentUser.username);
+            myAvatar.style.backgroundColor = currentUser.avatarColor;
+            document.getElementById('my-display-name').textContent = currentUser.username;
+            document.getElementById('my-friend-id').textContent = currentUser.friendId;
+
+            // Switch views
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+
+            // Initialize real-time PeerJS WebRTC node
+            initPeerNetwork();
+
+            // If user opened via invite link (?connect=WC-XXXX-XXXX), auto-add and open
+            if (inviteParamId && inviteParamId !== currentUser.friendId) {
+                addOrUpdateContact(inviteParamId, `Friend (${inviteParamId.slice(-4)})`);
+                selectFriendChat(inviteParamId);
+                inviteParamId = null;
+                // Clean URL query string without reloading
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            renderContactList();
+        }
+
+        function logoutUser() {
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+                peerInstance = null;
+            }
+            liveConnections = {};
+            onlinePeers = {};
+            activeFriendId = null;
+            currentUser = null;
+            localStorage.removeItem(STORAGE_KEYS.SESSION);
+
+            document.getElementById('auth-password').value = '';
+            document.getElementById('active-chat-container').classList.add('hidden');
+            document.getElementById('welcome-screen').classList.remove('hidden');
+            showAuthScreen();
+            showToast('Signed out cleanly.');
+        }
+
+        // =====================================================================
+        // 6. REAL-TIME CROSS-DEVICE WEBRTC ENGINE (PEERJS)
+        // =====================================================================
+        function initPeerNetwork() {
+            if (peerInstance) {
+                try { peerInstance.destroy(); } catch (e) {}
+            }
+
+            setNetworkStatus('connecting', 'Connecting to live network...');
+
+            try {
+                peerInstance = new Peer(currentUser.friendId, {
+                    debug: 1
+                });
+
+                peerInstance.on('open', (id) => {
+                    setNetworkStatus('online', 'Live & ready to chat');
+                    // Re-establish connections to existing friends
+                    Object.keys(currentUser.contacts || {}).forEach(fid => {
+                        connectToFriendPeer(fid, true);
+                    });
+                });
+
+                peerInstance.on('connection', (conn) => {
+                    setupDataConnection(conn);
+                });
+
+                peerInstance.on('disconnected', () => {
+                    setNetworkStatus('connecting', 'Reconnecting...');
+                    if (peerInstance && !peerInstance.destroyed) {
+                        peerInstance.reconnect();
+                    }
+                });
+
+                peerInstance.on('error', (err) => {
+                    console.warn('PeerJS notice:', err.type, err);
+                    if (err.type === 'peer-unavailable') {
+                        // Friend is currently offline; messages will stay saved locally
+                        const match = err.message && err.message.match(/WC-[A-Z0-9]{4}-[A-Z0-9]{4}/i);
+                        if (match) {
+                            const offlineId = match[0].toUpperCase();
+                            onlinePeers[offlineId] = false;
+                            updateFriendStatusUI(offlineId);
+                        }
+                    } else if (err.type === 'unavailable-id') {
+                        setNetworkStatus('online', 'Active in another tab');
+                    } else {
+                        setNetworkStatus('offline', 'Network standby');
+                    }
+                });
+            } catch (e) {
+                setNetworkStatus('offline', 'Offline mode');
+            }
+        }
+
+        function setNetworkStatus(state, text) {
+            const dot = document.getElementById('network-status-dot');
+            const label = document.getElementById('network-status-text');
+            label.textContent = text;
+            dot.className = 'w-2.5 h-2.5 rounded-full shrink-0 ' + (
+                state === 'online' ? 'bg-[#00a884]' :
+                state === 'connecting' ? 'bg-amber-400 animate-pulse' :
+                'bg-gray-400'
+            );
+        }
+
+        function connectToFriendPeer(friendId, silent = false) {
+            if (!peerInstance || peerInstance.disconnected || peerInstance.destroyed) return;
+            if (!friendId || friendId === currentUser.friendId) return;
+
+            const existing = liveConnections[friendId];
+            if (existing && existing.open) {
+                onlinePeers[friendId] = true;
+                updateFriendStatusUI(friendId);
+                return;
+            }
+
+            try {
+                const conn = peerInstance.connect(friendId, { reliable: true });
+                setupDataConnection(conn, silent);
+            } catch (e) {
+                if (!silent) showToast('Could not reach friend right now.', 'error');
+            }
+        }
+
+        function setupDataConnection(conn, silent = false) {
+            const remoteId = conn.peer.toUpperCase();
+            liveConnections[remoteId] = conn;
+
+            conn.on('open', () => {
+                onlinePeers[remoteId] = true;
+
+                // Ensure friend is in contact list
+                if (!currentUser.contacts[remoteId]) {
+                    addOrUpdateContact(remoteId, `Friend (${remoteId.slice(-4)})`);
+                }
+
+                // Send profile handshake + flush any undelivered messages
+                conn.send({
+                    type: 'profile',
+                    name: currentUser.username,
+                    avatarColor: currentUser.avatarColor,
+                    friendId: currentUser.friendId
+                });
+
+                flushPendingMessages(remoteId, conn);
+                updateFriendStatusUI(remoteId);
+                renderContactList();
+
+                if (!silent) {
+                    const displayName = currentUser.contacts[remoteId]?.name || remoteId;
+                    showToast(`${displayName} is connected live!`);
+                }
+            });
+
+            conn.on('data', (payload) => {
+                handleIncomingPeerData(remoteId, payload);
+            });
+
+            conn.on('close', () => {
+                onlinePeers[remoteId] = false;
+                delete liveConnections[remoteId];
+                updateFriendStatusUI(remoteId);
+                renderContactList();
+            });
+
+            conn.on('error', () => {
+                onlinePeers[remoteId] = false;
+                updateFriendStatusUI(remoteId);
+            });
+        }
+
+        function handleIncomingPeerData(remoteId, payload) {
+            if (!payload || typeof payload !== 'object') return;
+
+            if (payload.type === 'profile') {
+                addOrUpdateContact(remoteId, payload.name, payload.avatarColor);
+                renderContactList();
+                if (activeFriendId === remoteId) {
+                    updateActiveChatHeader();
+                }
+                return;
+            }
+
+            if (payload.type === 'typing') {
+                clearTimeout(typingPeers[remoteId]);
+                typingPeers[remoteId] = setTimeout(() => {
+                    delete typingPeers[remoteId];
+                    updateFriendStatusUI(remoteId);
+                    renderContactList();
+                }, 2200);
+                updateFriendStatusUI(remoteId);
+                renderContactList();
+                return;
+            }
+
+            if (payload.type === 'ack') {
+                // Mark our sent message as delivered / read (blue double ticks)
+                const msgs = currentUser.messages[remoteId] || [];
+                const target = msgs.find(m => m.id === payload.msgId);
+                if (target) {
+                    target.status = payload.status || 'read';
+                    persistCurrentUser();
+                    if (activeFriendId === remoteId) {
+                        renderMessages();
+                    }
+                }
+                return;
+            }
+
+            if (payload.type === 'chat') {
+                // Ensure sender is saved in contacts
+                if (!currentUser.contacts[remoteId]) {
+                    addOrUpdateContact(remoteId, payload.senderName || `Friend (${remoteId.slice(-4)})`);
+                } else if (payload.senderName && currentUser.contacts[remoteId].name.startsWith('Friend (')) {
+                    currentUser.contacts[remoteId].name = payload.senderName;
+                }
+
+                // Clear typing indicator immediately
+                delete typingPeers[remoteId];
+
+                const incomingMsg = {
+                    id: payload.id || ('msg_' + Date.now()),
+                    sender: 'them',
+                    text: payload.text || '',
+                    media: payload.media || null,
+                    timestamp: payload.timestamp || Date.now(),
+                    status: 'read'
+                };
+
+                if (!currentUser.messages[remoteId]) {
+                    currentUser.messages[remoteId] = [];
+                }
+                // Avoid duplicate message IDs
+                if (!currentUser.messages[remoteId].some(m => m.id === incomingMsg.id)) {
+                    currentUser.messages[remoteId].push(incomingMsg);
+                }
+
+                // Increment unread badge if chat isn't currently open
+                if (activeFriendId !== remoteId) {
+                    currentUser.contacts[remoteId].unread = (currentUser.contacts[remoteId].unread || 0) + 1;
+                    playIncomingBeep();
+                } else {
+                    renderMessages();
+                }
+
+                persistCurrentUser();
+                renderContactList();
+
+                // Send delivery/read receipt back to sender
+                const conn = liveConnections[remoteId];
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'ack',
+                        msgId: incomingMsg.id,
+                        status: activeFriendId === remoteId ? 'read' : 'delivered'
+                    });
+                }
+            }
+        }
+
+        function flushPendingMessages(friendId, conn) {
+            const msgs = currentUser.messages[friendId] || [];
+            msgs.forEach(m => {
+                if (m.sender === 'me' && m.status === 'sent') {
+                    conn.send({
+                        type: 'chat',
+                        id: m.id,
+                        senderName: currentUser.username,
+                        text: m.text,
+                        media: m.media,
+                        timestamp: m.timestamp
+                    });
+                    m.status = 'delivered';
+                }
+            });
+            persistCurrentUser();
+            if (activeFriendId === friendId) renderMessages();
+        }
+
+        // Subtle Web Audio API notification pop (zero external sound URLs)
+        function playIncomingBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(660, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.09);
+                gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        // =====================================================================
+        // 7. CONTACTS & SIDEBAR RENDERING
+        // =====================================================================
+        function addOrUpdateContact(friendId, name, avatarColor) {
+            const cleanId = friendId.trim().toUpperCase();
+            if (!currentUser.contacts) currentUser.contacts = {};
+            const existing = currentUser.contacts[cleanId];
+            currentUser.contacts[cleanId] = {
+                friendId: cleanId,
+                name: name || existing?.name || `Friend (${cleanId.slice(-4)})`,
+                avatarColor: avatarColor || existing?.avatarColor || getRandomAvatarColor(cleanId),
+                unread: existing?.unread || 0
+            };
+            if (!currentUser.messages[cleanId]) {
+                currentUser.messages[cleanId] = [];
+            }
+            persistCurrentUser();
+        }
+
+        function renderContactList() {
+            const container = document.getElementById('contacts-list');
+            const query = document.getElementById('chat-search-input').value.trim().toLowerCase();
+            const contacts = Object.values(currentUser.contacts || {});
+
+            // Sort by latest message timestamp
+            contacts.sort((a, b) => {
+                const msgsA = currentUser.messages[a.friendId] || [];
+                const msgsB = currentUser.messages[b.friendId] || [];
+                const lastA = msgsA.length ? msgsA[msgsA.length - 1].timestamp : 0;
+                const lastB = msgsB.length ? msgsB[msgsB.length - 1].timestamp : 0;
+                return lastB - lastA;
+            });
+
+            const filtered = contacts.filter(c =>
+                c.name.toLowerCase().includes(query) ||
+                c.friendId.toLowerCase().includes(query)
+            );
+
+            if (!filtered.length) {
+                container.innerHTML = `
+                    <div class="p-8 text-center">
+                        <p class="text-sm font-medium text-[#54656f] dark:text-[#8696a0]">
+                            ${contacts.length ? 'No matching chats found.' : 'No friends added yet.'}
+                        </p>
+                        <p class="text-xs text-[#8696a0] mt-1">
+                            Click <strong>"Connect with a Friend"</strong> below and enter their Friend ID to start chatting!
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            filtered.forEach(contact => {
+                const msgs = currentUser.messages[contact.friendId] || [];
+                const lastMsg = msgs.length ? msgs[msgs.length - 1] : null;
+                const isSelected = activeFriendId === contact.friendId;
+                const isOnline = !!onlinePeers[contact.friendId];
+                const isTyping = !!typingPeers[contact.friendId];
+
+                let previewText = contact.friendId;
+                if (isTyping) {
+                    previewText = 'typing...';
+                } else if (lastMsg) {
+                    if (lastMsg.media) {
+                        const icon = lastMsg.media.type === 'image' ? '📷 Photo' : lastMsg.media.type === 'video' ? '🎥 Video' : '🎵 Audio';
+                        previewText = lastMsg.text ? `${icon}: ${lastMsg.text}` : icon;
+                    } else {
+                        previewText = lastMsg.text;
+                    }
+                }
+
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.className = `w-full px-3.5 py-3 flex items-center gap-3 text-left transition ${
+                    isSelected
+                        ? 'bg-[#f0f2f5] dark:bg-[#2a3942]'
+                        : 'hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]'
+                }`;
+                row.onclick = () => selectFriendChat(contact.friendId);
+
+                row.innerHTML = `
+                    <div class="relative shrink-0">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:${contact.avatarColor}">
+                            ${getInitials(contact.name)}
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-[#111b21] ${isOnline ? 'bg-[#00a884]' : 'bg-gray-400'}"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-semibold text-sm truncate text-[#111b21] dark:text-[#e9edef]">
+                                ${escapeHtml(contact.name)}
+                            </span>
+                            <span class="text-[11px] shrink-0 ${contact.unread ? 'text-[#00a884] font-semibold' : 'text-[#667781] dark:text-[#8696a0]'}">
+                                ${lastMsg ? formatTime(lastMsg.timestamp) : ''}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 mt-0.5">
+                            <p class="text-xs truncate ${isTyping ? 'text-[#00a884] font-semibold' : 'text-[#667781] dark:text-[#8696a0]'}">
+                                ${escapeHtml(previewText)}
+                            </p>
+                            ${contact.unread > 0 ? `
+                                <span class="px-1.5 py-0.5 min-w-[20px] text-center rounded-full bg-[#00a884] text-white text-[11px] font-bold shrink-0">
+                                    ${contact.unread}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // =====================================================================
+        // 8. ACTIVE CHAT SELECTION & RESPONSIVE MOBILE NAVIGATION
+        // =====================================================================
+        function selectFriendChat(friendId) {
+            activeFriendId = friendId;
+            if (currentUser.contacts[friendId]) {
+                currentUser.contacts[friendId].unread = 0;
+                persistCurrentUser();
+            }
+
+            // Mobile responsive view toggle
+            document.getElementById('sidebar-panel').classList.add('hidden', 'md:flex');
+            const chatPanel = document.getElementById('chat-panel');
+            chatPanel.classList.remove('hidden');
+            chatPanel.classList.add('flex');
+
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('active-chat-container').classList.remove('hidden');
+
+            updateActiveChatHeader();
+            renderContactList();
+            renderMessages();
+
+            // Attempt live P2P connection if not already open
+            connectToFriendPeer(friendId, true);
+
+            // Send read acknowledgment if connected
+            const conn = liveConnections[friendId];
+            const msgs = currentUser.messages[friendId] || [];
+            if (conn && conn.open && msgs.length) {
+                const lastThem = [...msgs].reverse().find(m => m.sender === 'them');
+                if (lastThem) {
+                    conn.send({ type: 'ack', msgId: lastThem.id, status: 'read' });
+                }
+            }
+        }
+
+        function closeMobileChat() {
+            activeFriendId = null;
+            document.getElementById('sidebar-panel').classList.remove('hidden');
+            document.getElementById('chat-panel').classList.add('hidden');
+            document.getElementById('chat-panel').classList.remove('flex');
+            renderContactList();
+        }
+
+        function updateActiveChatHeader() {
+            if (!activeFriendId) return;
+            const contact = currentUser.contacts[activeFriendId];
+            if (!contact) return;
+
+            const avatar = document.getElementById('active-friend-avatar');
+            avatar.textContent = getInitials(contact.name);
+            avatar.style.backgroundColor = contact.avatarColor;
+            document.getElementById('active-friend-name').textContent = contact.name;
+            updateFriendStatusUI(activeFriendId);
+        }
+
+        function updateFriendStatusUI(friendId) {
+            if (activeFriendId !== friendId) return;
+            const statusEl = document.getElementById('active-friend-status');
+            if (typingPeers[friendId]) {
+                statusEl.textContent = 'typing...';
+                statusEl.className = 'text-xs font-semibold text-[#00a884] truncate';
+            } else if (onlinePeers[friendId]) {
+                statusEl.textContent = `Online • ${friendId}`;
+                statusEl.className = 'text-xs font-medium text-[#00a884] truncate';
+            } else {
+                statusEl.textContent = `Offline • ${friendId}`;
+                statusEl.className = 'text-xs text-[#54656f] dark:text-[#8696a0] truncate';
+            }
+        }
+
+        function reconnectActiveFriend() {
+            if (!activeFriendId) return;
+            showToast(`Connecting to ${activeFriendId}...`);
+            connectToFriendPeer(activeFriendId, false);
+        }
+
+        // =====================================================================
+        // 9. MESSAGING, TYPING INDICATORS & MEDIA ATTACHMENTS
+        // =====================================================================
+        function handleTypingInput() {
+            if (!activeFriendId) return;
+            const now = Date.now();
+            if (now - lastTypingSentAt > 1200) {
+                lastTypingSentAt = now;
+                const conn = liveConnections[activeFriendId];
+                if (conn && conn.open) {
+                    conn.send({ type: 'typing' });
+                }
+            }
+        }
+
+        function handleMediaFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const isImage = file.type.startsWith('image/');
+            const isVideo = file.type.startsWith('video/');
+            const isAudio = file.type.startsWith('audio/');
+
+            if (!isImage && !isVideo && !isAudio) {
+                showToast('Please select an image, video, or audio file.', 'error');
+                return;
+            }
+
+            // Cap video/audio at 4.5MB so WebRTC & localStorage remain smooth
+            if (!isImage && file.size > 4.5 * 1024 * 1024) {
+                showToast('Video/Audio must be under 4.5 MB for fast P2P transfer.', 'error');
+                event.target.value = '';
+                return;
+            }
+
+            if (isImage) {
+                compressImageFile(file, (compressedDataUrl, approxSizeKB) => {
+                    pendingAttachment = {
+                        type: 'image',
+                        dataUrl: compressedDataUrl,
+                        name: file.name,
+                        sizeLabel: `${approxSizeKB} KB (Optimized)`
+                    };
+                    showAttachmentPreview();
+                });
+            } else {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    pendingAttachment = {
+                        type: isVideo ? 'video' : 'audio',
+                        dataUrl: reader.result,
+                        name: file.name,
+                        sizeLabel: `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                    };
+                    showAttachmentPreview();
+                };
+                reader.readAsDataURL(file);
+            }
+            event.target.value = '';
+        }
+
+        // Automatic HTML5 Canvas image compression for fast cross-device delivery
+        function compressImageFile(file, callback) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const maxDim = 960;
+                    let { width, height } = img;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                    const approxKB = Math.round((dataUrl.length * 3) / 4 / 1024);
+                    callback(dataUrl, approxKB);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showAttachmentPreview() {
+            if (!pendingAttachment) return;
+            const bar = document.getElementById('attachment-preview-bar');
+            const thumb = document.getElementById('attachment-thumb');
+            document.getElementById('attachment-name').textContent = pendingAttachment.name;
+            document.getElementById('attachment-meta').textContent = pendingAttachment.sizeLabel;
+
+            if (pendingAttachment.type === 'image') {
+                thumb.innerHTML = `<img src="${pendingAttachment.dataUrl}" class="w-full h-full object-cover" alt="Preview">`;
+            } else if (pendingAttachment.type === 'video') {
+                thumb.innerHTML = `<span class="text-xl">🎥</span>`;
+            } else {
+                thumb.innerHTML = `<span class="text-xl">🎵</span>`;
+            }
+            bar.classList.remove('hidden');
+        }
+
+        function clearPendingAttachment() {
+            pendingAttachment = null;
+            document.getElementById('attachment-preview-bar').classList.add('hidden');
+        }
+
+        function sendCurrentMessage() {
+            if (!activeFriendId) return;
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+
+            if (!text && !pendingAttachment) return;
+
+            const conn = liveConnections[activeFriendId];
+            const isConnected = !!(conn && conn.open);
+
+            const msgObj = {
+                id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                sender: 'me',
+                text: text,
+                media: pendingAttachment ? { ...pendingAttachment } : null,
+                timestamp: Date.now(),
+                status: isConnected ? 'delivered' : 'sent'
+            };
+
+            if (!currentUser.messages[activeFriendId]) {
+                currentUser.messages[activeFriendId] = [];
+            }
+            currentUser.messages[activeFriendId].push(msgObj);
+            persistCurrentUser();
+
+            // Transmit over WebRTC DataChannel if friend is online
+            if (isConnected) {
+                conn.send({
+                    type: 'chat',
+                    id: msgObj.id,
+                    senderName: currentUser.username,
+                    text: msgObj.text,
+                    media: msgObj.media,
+                    timestamp: msgObj.timestamp
+                });
+            } else {
+                // Attempt background reconnect so queued message flushes as soon as they join
+                connectToFriendPeer(activeFriendId, true);
+            }
+
+            input.value = '';
+            clearPendingAttachment();
+            document.getElementById('emoji-picker').classList.add('hidden');
+            renderMessages();
+            renderContactList();
+        }
+
+        function renderMessages() {
+            if (!activeFriendId) return;
+            const container = document.getElementById('messages-container');
+            const msgs = currentUser.messages[activeFriendId] || [];
+
+            if (!msgs.length) {
+                container.innerHTML = `
+                    <div class="flex justify-center my-6">
+                        <div class="max-w-xs text-center px-4 py-2.5 rounded-xl bg-[#ffeecd] dark:bg-[#182229] text-[#54656f] dark:text-[#ffd279] text-xs shadow-xs">
+                            Messages are sent peer-to-peer directly to your friend's browser and saved locally on your device.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            msgs.forEach(msg => {
+                const isMe = msg.sender === 'me';
+                const wrapper = document.createElement('div');
+                wrapper.className = `flex ${isMe ? 'justify-end' : 'justify-start'} msg-animate`;
+
+                let mediaHtml = '';
+                if (msg.media) {
+                    if (msg.media.type === 'image') {
+                        mediaHtml = `
+                            <div class="mb-1.5 overflow-hidden rounded-lg cursor-pointer bg-black/5" onclick="openLightbox('${msg.media.dataUrl}', '${escapeHtml(msg.media.name || 'Photo')}')">
+                                <img src="${msg.media.dataUrl}" alt="Shared photo" class="max-h-64 w-full object-cover hover:opacity-95 transition">
+                            </div>
+                        `;
+                    } else if (msg.media.type === 'video') {
+                        mediaHtml = `
+                            <div class="mb-1.5 overflow-hidden rounded-lg bg-black">
+                                <video src="${msg.media.dataUrl}" controls playsinline class="max-h-64 w-full"></video>
+                            </div>
+                        `;
+                    } else if (msg.media.type === 'audio') {
+                        mediaHtml = `
+                            <div class="mb-1.5">
+                                <audio src="${msg.media.dataUrl}" controls class="max-w-[240px] sm:max-w-[280px] h-10"></audio>
+                            </div>
+                        `;
+                    }
+                }
+
+                // Ticks: single grey check (queued), double grey check (delivered), double blue check (read)
+                let tickHtml = '';
+                if (isMe) {
+                    if (msg.status === 'read') {
+                        tickHtml = `<span class="text-[#53bdeb] font-bold ml-1" title="Read">✓✓</span>`;
+                    } else if (msg.status === 'delivered') {
+                        tickHtml = `<span class="text-[#667781] dark:text-[#8696a0] ml-1" title="Delivered">✓✓</span>`;
+                    } else {
+                        tickHtml = `<span class="text-[#667781] dark:text-[#8696a0] ml-1" title="Saved (Waiting for friend to come online)">✓</span>`;
+                    }
+                }
+
+                wrapper.innerHTML = `
+                    <div class="max-w-[82%] sm:max-w-[68%] px-3 py-2 rounded-2xl shadow-xs relative ${
+                        isMe
+                            ? 'bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef] rounded-tr-xs'
+                            : 'bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-xs'
+                    }">
+                        ${mediaHtml}
+                        ${msg.text ? `<p class="text-sm whitespace-pre-wrap break-words leading-relaxed">${escapeHtml(msg.text)}</p>` : ''}
+                        <div class="flex items-center justify-end gap-0.5 mt-1 text-[10px] text-[#667781] dark:text-[#8696a0]">
+                            <span>${formatTime(msg.timestamp)}</span>
+                            ${tickHtml}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(wrapper);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // =====================================================================
+        // 10. MODALS, EMOJI PICKER, CLIPBOARD & LIGHTBOX HELPERS
+        // =====================================================================
+        function renderEmojiGrid() {
+            const grid = document.getElementById('emoji-grid');
+            QUICK_EMOJIS.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = emoji;
+                btn.className = 'p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition text-center';
+                btn.onclick = () => {
+                    const input = document.getElementById('message-input');
+                    input.value += emoji;
+                    input.focus();
+                };
+                grid.appendChild(btn);
+            });
+        }
+
+        function toggleEmojiPicker() {
+            document.getElementById('emoji-picker').classList.toggle('hidden');
+        }
+
+        function openAddFriendModal() {
+            document.getElementById('friend-id-input').value = '';
+            document.getElementById('friend-nickname-input').value = '';
+            document.getElementById('add-friend-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('friend-id-input').focus(), 50);
+        }
+
+        function closeAddFriendModal() {
+            document.getElementById('add-friend-modal').classList.add('hidden');
+        }
+
+        function handleAddFriendSubmit(event) {
+            event.preventDefault();
+            const rawId = document.getElementById('friend-id-input').value.trim().toUpperCase();
+            const nickname = document.getElementById('friend-nickname-input').value.trim();
+
+            if (!/^WC-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(rawId)) {
+                showToast('Please enter a valid Friend ID (e.g., WC-4829-1930).', 'error');
+                return;
+            }
+            if (rawId === currentUser.friendId) {
+                showToast('That is your own Friend ID! Share it with a friend.', 'error');
+                return;
+            }
+
+            addOrUpdateContact(rawId, nickname || `Friend (${rawId.slice(-4)})`);
+            closeAddFriendModal();
+            selectFriendChat(rawId);
+            connectToFriendPeer(rawId, false);
+        }
+
+        function openClearChatModal() {
+            if (!activeFriendId) return;
+            document.getElementById('clear-chat-modal').classList.remove('hidden');
+        }
+
+        function closeClearChatModal() {
+            document.getElementById('clear-chat-modal').classList.add('hidden');
+        }
+
+        function confirmClearChat() {
+            if (activeFriendId) {
+                currentUser.messages[activeFriendId] = [];
+                persistCurrentUser();
+                renderMessages();
+                renderContactList();
+                showToast('Chat cleared.');
+            }
+            closeClearChatModal();
+        }
+
+        function openLightbox(src, caption) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox-caption').textContent = caption;
+            document.getElementById('lightbox-download').href = src;
+            document.getElementById('lightbox-modal').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').classList.add('hidden');
+        }
+
+        function copyMyFriendId() {
+            if (!currentUser) return;
+            copyTextFallback(currentUser.friendId, `Copied Friend ID: ${currentUser.friendId}`);
+        }
+
+        function copyMyInviteLink() {
+            if (!currentUser) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('connect', currentUser.friendId);
+            copyTextFallback(url.toString(), 'Invite link copied! Send it to your friend.');
+        }
+
+        function copyTextFallback(text, successMessage) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast(successMessage);
+            } catch (err) {
+                showToast('Could not copy automatically.', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-xs font-semibold text-white flex items-center gap-2 transition transform translate-y-0 ${
+                type === 'error' ? 'bg-red-600' : 'bg-[#111b21] dark:bg-[#00a884]'
+            }`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 250);
+            }, 3000);
+        }
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
